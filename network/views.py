@@ -6,23 +6,31 @@ from django.urls import reverse
 from django.core.paginator import Paginator
 import json
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import User, Post, Follow, Like
 
 
-def remove_like(request, post_id):
-    post = Post.objects.get(pk=post_id)
-    user = User.objects.get(pk=request.user.id)
-    like = Like.objects.filter(user=user, post=post)
-    like.delete()
-    return JsonResponse({"message": "Like removed!"})
-
+@csrf_exempt
 def add_like(request, post_id):
     post = Post.objects.get(pk=post_id)
-    user = User.objects.get(pk=request.user.id)
-    newLike = Like(user=user, post=post)
-    newLike.save()
-    return JsonResponse({"message": "Like added!"})
+    user = request.user
+    like, created = Like.objects.get_or_create(user=user, post=post)
+    return JsonResponse({
+        "message": "Like added!",
+        "like_count": Like.objects.filter(post=post).count()
+    })
+
+@csrf_exempt
+def remove_like(request, post_id):
+    post = Post.objects.get(pk=post_id)
+    user = request.user
+    Like.objects.filter(user=user, post=post).delete()
+    return JsonResponse({
+        "message": "Like removed!",
+        "like_count": Like.objects.filter(post=post).count()
+    })
+
 
 def edit(request, post_id):
     if request.method == "POST":
@@ -186,3 +194,8 @@ def register(request):
         return HttpResponseRedirect(reverse("index"))
     else:
         return render(request, "network/register.html")
+
+def like_count(request, post_id):
+    post = Post.objects.get(pk=post_id)
+    count = Like.objects.filter(post=post).count()
+    return JsonResponse({"count": count})
